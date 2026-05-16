@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette.responses import StreamingResponse
 
 from backend.database import get_db
 from backend.models import LPODocument, LPOLineItem
@@ -21,6 +22,7 @@ from backend.schemas import (
 )
 from backend.services.ai_extractor import extract_lpo_data
 from backend.services.pdf_parser import extract_text_from_pdf
+from backend.services.sheets_export import generate_pick_list_csv, generate_raw_data_csv
 
 router = APIRouter(prefix="/api/lpo", tags=["LPO"])
 
@@ -215,3 +217,108 @@ async def update_item_status(
         await db.commit()
 
     return {"item_id": item_id, "status": body.status}
+
+
+@router.get("/export")
+async def export_data(
+    format: str = "csv",
+    date: Optional[str] = None,
+    type: str = "raw",
+    db: AsyncSession = Depends(get_db),
+):
+    """Export LPO data as a downloadable CSV file.
+
+    Query Parameters:
+        format: Export format (currently only 'csv' is supported)
+        date: Date filter in YYYY-MM-DD format (defaults to today)
+        type: 'raw' for raw LPO data, 'picklist' for consolidated pick list
+    """
+    if format != "csv":
+        raise HTTPException(status_code=400, detail="Only CSV format is supported.")
+
+    if type not in ("raw", "picklist"):
+        raise HTTPException(
+            status_code=400, detail="Type must be 'raw' or 'picklist'."
+        )
+
+    # Determine target date
+    from datetime import date as date_type
+
+    if date:
+        try:
+            target_date = datetime.strptime(date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=400, detail="Invalid date format. Use YYYY-MM-DD."
+            )
+    else:
+        target_date = date_type.today()
+
+    # Query line items for the target date with their documents
+    query = (
+        select(LPOLineItem)
+        .where(LPOLineItem.date_extracted == target_date)
+        .options(selectinload(LPOLineItem.document))
+    )
+    result = await db.execute(query)
+    items = result.scalars().all()
+
+    if type == "raw":
+        # Generate raw data CSV
+        raw_items = [
+            {
+                "date": item.date_extracted.isoformat(),
+                "customer_name": item.document.customer_name or "Unknown",
+                "item_name": item.item_name,
+                "quantity": item.quantity,
+                "unit": item.unit,
+            }
+            for item in items
+        ]
+        csv_content = generate_raw_data_csv(raw_items)
+        filename = f"lpo_raw_data_{target_date.isoformat()}.csv"
+    else:
+        # Generate pick list CSV (aggregated)
+        procurement_map = defaultdict(
+            lambda: {"total_quantity": 0.0, "unit": ""}
+        )
+        for item in items:
+            key = (item.item_name.lower(), item.unit.lower())
+            procurement_map[key]["total_quantity"] += item.quantity
+            procurement_map[key]["unit"] = item.unit
+
+        master_items = [
+            {
+                "item_name": key[0].title(),
+                "total_quantity": data["total_quantity"],
+                "unit": data["unit"],
+            }
+            for key, data in procurement_map.items()
+        ]
+
+        distribution_map = defaultdict(list)
+        for item in items:
+            customer = item.document.customer_name or "Unknown"
+            distribution_map[customer].append(
+                {
+                    "item_name": item.item_name,
+                    "quantity": item.quantity,
+                    "unit": item.unit,
+                }
+            )
+
+        distribution = [
+            {"customer_name": customer, "items": items_list}
+            for customer, items_list in distribution_map.items()
+        ]
+
+        csv_content = generate_pick_list_csv(master_items, distribution)
+        filename = f"marikiti_pick_list_{target_date.isoformat()}.csv"
+
+    import io
+
+    return StreamingResponse(
+        io.StringIO(csv_content),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

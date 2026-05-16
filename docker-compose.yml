@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./backend/data/lpo.db}
+    volumes:
+      - lpo_data:/app/backend/data
+    restart: unless-stopped
+
+volumes:
+  lpo_data:
