@@ -194,6 +194,11 @@ export default function Dashboard() {
               ))}
             </div>
           </section>
+
+          {/* Signature */}
+          <p className="text-center text-xs text-gray-300 mt-6">
+            nativecodesdevelopers@gmail.com
+          </p>
         </>
       )}
     </div>

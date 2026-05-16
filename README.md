@@ -93,6 +93,8 @@ In development, the frontend dev server runs on port 5173 and proxies API reques
 | GET | `/api/lpo/dashboard` | Get aggregated procurement totals and distribution (optional `?date_filter=YYYY-MM-DD`) |
 | PATCH | `/api/lpo/items/{item_id}/status` | Update procurement status of a line item |
 | GET | `/api/lpo/export` | Export data as CSV (params: `format=csv`, `date=YYYY-MM-DD`, `type=raw\|picklist`) |
+| GET | `/api/email/status` | Get email ingestion service status |
+| POST | `/api/email/poll` | Manually trigger an immediate email poll |
 
 ### Export Endpoint Details
 
@@ -110,6 +112,60 @@ curl http://localhost:8000/api/lpo/export?format=csv&type=picklist&date=2024-01-
 |----------|----------|---------|-------------|
 | `OPENAI_API_KEY` | No | - | OpenAI API key for AI-powered PDF extraction. System falls back to regex parsing if not set. |
 | `DATABASE_URL` | No | `sqlite+aiosqlite:///./backend/data/lpo.db` | Async database connection URL. |
+| `EMAIL_ENABLED` | No | `false` | Set to `true` to enable automatic email ingestion. |
+| `EMAIL_IMAP_HOST` | No | `imap.gmail.com` | IMAP server host. |
+| `EMAIL_IMAP_PORT` | No | `993` | IMAP server port (SSL). |
+| `EMAIL_ADDRESS` | No | - | Email address to poll for LPO PDFs. |
+| `EMAIL_PASSWORD` | No | - | Gmail App Password (not your regular password). |
+| `EMAIL_POLL_INTERVAL` | No | `5` | Polling interval in minutes. |
+
+## Email Ingestion
+
+The system can automatically poll a Gmail inbox for PDF attachments, download them, and process them through the AI extraction pipeline. This eliminates the need for Make.com or Google Drive integration.
+
+### How It Works
+
+1. The service connects to your Gmail inbox via IMAP (SSL)
+2. It polls for unread emails at a configurable interval (default: every 5 minutes)
+3. PDF attachments are extracted from unread emails
+4. Each PDF is processed through the same pipeline as manual uploads
+5. Processed emails are marked as read so they are not reprocessed
+6. Results appear on the dashboard alongside manually uploaded LPOs
+
+### Setup: Creating a Gmail App Password
+
+Gmail requires an App Password for IMAP access (your regular password will not work):
+
+1. Go to your Google Account at [myaccount.google.com](https://myaccount.google.com)
+2. Navigate to Security > 2-Step Verification (must be enabled)
+3. At the bottom, click "App passwords"
+4. Select "Mail" and your device, then click "Generate"
+5. Copy the 16-character password that appears
+
+### Configuration
+
+Set these environment variables (in `.env` or docker-compose):
+
+```bash
+EMAIL_ENABLED=true
+EMAIL_ADDRESS=your-orders@gmail.com
+EMAIL_PASSWORD=abcd efgh ijkl mnop   # The 16-char App Password
+EMAIL_POLL_INTERVAL=5                 # Minutes between polls (default: 5)
+EMAIL_IMAP_HOST=imap.gmail.com        # Default, change for other providers
+EMAIL_IMAP_PORT=993                   # Default SSL port
+```
+
+### API Endpoints
+
+- **GET `/api/email/status`** - Check if email ingestion is running, last poll time, errors
+- **POST `/api/email/poll`** - Manually trigger an immediate poll (useful for testing)
+
+### Notes
+
+- Email ingestion is completely optional. If `EMAIL_ENABLED` is not `true`, the app works exactly as before.
+- Documents ingested via email are prefixed with `[email]` in the filename for identification.
+- The service handles errors gracefully: malformed emails are skipped, and processing continues.
+- The background scheduler starts automatically with the FastAPI application.
 
 ## Production Integration Guide
 

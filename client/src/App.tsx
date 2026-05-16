@@ -17,6 +17,14 @@ export default function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/raw-data" element={<RawData />} />
           </Routes>
+          <footer className="text-center py-4 px-2">
+            <p className="text-xs text-gray-400">
+              Developed by NativeCodes Developers
+            </p>
+            <p className="text-xs text-gray-400">
+              nativecodesdevelopers@gmail.com
+            </p>
+          </footer>
         </main>
         <BottomNav />
       </div>
