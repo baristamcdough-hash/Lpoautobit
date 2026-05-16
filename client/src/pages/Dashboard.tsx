@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Check, Loader, RefreshCw } from 'lucide-react';
-import { getDashboard, toggleItemStatus } from '../services/api';
+import { Check, Download, Loader, RefreshCw } from 'lucide-react';
+import { getDashboard, getExportUrl, toggleItemStatus } from '../services/api';
 import type { DashboardData } from '../services/api';
 
 function getTodayString(): string {
@@ -90,6 +90,14 @@ export default function Dashboard() {
         >
           <RefreshCw className="w-5 h-5 text-slate-600" />
         </button>
+        <a
+          href={getExportUrl(date)}
+          download
+          className="p-2 border border-teal-300 rounded-lg hover:bg-teal-50 bg-white"
+          aria-label="Download Excel"
+        >
+          <Download className="w-5 h-5 text-teal-600" />
+        </a>
       </div>
 
       {isEmpty ? (

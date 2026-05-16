@@ -11,3 +11,4 @@ pytest-asyncio
 httpx
 python-dotenv
 fpdf2
+openpyxl

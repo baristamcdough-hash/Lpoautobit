@@ -87,4 +87,8 @@ export async function toggleItemStatus(itemId: number, status: string): Promise<
   await api.patch(`/lpo/items/${itemId}/status`, { status });
 }
 
+export function getExportUrl(date: string, format: string = 'xlsx', type: string = 'picklist'): string {
+  return `/api/lpo/export?format=${format}&date=${date}&type=${type}`;
+}
+
 export default api;

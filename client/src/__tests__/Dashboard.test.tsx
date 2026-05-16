@@ -6,6 +6,7 @@ import Dashboard from '../pages/Dashboard';
 vi.mock('../services/api', () => ({
   getDashboard: vi.fn(),
   toggleItemStatus: vi.fn(),
+  getExportUrl: vi.fn(() => '/api/lpo/export?format=xlsx&date=2024-01-15&type=picklist'),
 }));
 
 import { getDashboard } from '../services/api';

@@ -244,20 +244,20 @@ async def update_item_status(
 
 @router.get("/export")
 async def export_data(
-    format: str = "csv",
+    format: str = "xlsx",
     date: Optional[str] = None,
     type: str = "raw",
     db: AsyncSession = Depends(get_db),
 ):
-    """Export LPO data as a downloadable CSV file.
+    """Export LPO data as a downloadable file (CSV or Excel).
 
     Query Parameters:
-        format: Export format (currently only 'csv' is supported)
+        format: Export format ('csv' or 'xlsx', defaults to 'xlsx')
         date: Date filter in YYYY-MM-DD format (defaults to today)
         type: 'raw' for raw LPO data, 'picklist' for consolidated pick list
     """
-    if format != "csv":
-        raise HTTPException(status_code=400, detail="Only CSV format is supported.")
+    if format not in ("csv", "xlsx"):
+        raise HTTPException(status_code=400, detail="Format must be 'csv' or 'xlsx'.")
 
     if type not in ("raw", "picklist"):
         raise HTTPException(
@@ -286,8 +286,8 @@ async def export_data(
     result = await db.execute(query)
     items = result.scalars().all()
 
+    # Build data structures used by both formats
     if type == "raw":
-        # Generate raw data CSV
         raw_items = [
             {
                 "date": item.date_extracted.isoformat(),
@@ -298,10 +298,7 @@ async def export_data(
             }
             for item in items
         ]
-        csv_content = generate_raw_data_csv(raw_items)
-        filename = f"lpo_raw_data_{target_date.isoformat()}.csv"
     else:
-        # Generate pick list CSV (aggregated)
         procurement_map = defaultdict(
             lambda: {"total_quantity": 0.0, "unit": ""}
         )
@@ -335,13 +332,36 @@ async def export_data(
             for customer, items_list in distribution_map.items()
         ]
 
-        csv_content = generate_pick_list_csv(master_items, distribution)
-        filename = f"marikiti_pick_list_{target_date.isoformat()}.csv"
-
     import io
 
+    if format == "csv":
+        if type == "raw":
+            csv_content = generate_raw_data_csv(raw_items)
+            filename = f"lpo_raw_data_{target_date.isoformat()}.csv"
+        else:
+            csv_content = generate_pick_list_csv(master_items, distribution)
+            filename = f"marikiti_pick_list_{target_date.isoformat()}.csv"
+
+        return StreamingResponse(
+            io.StringIO(csv_content),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    # Excel (xlsx) format
+    from backend.services.sheets_export import generate_excel_export
+
+    if type == "raw":
+        excel_bytes = generate_excel_export(raw_items=raw_items)
+        filename = f"lpo_raw_data_{target_date.isoformat()}.xlsx"
+    else:
+        excel_bytes = generate_excel_export(
+            master_items=master_items, distribution=distribution
+        )
+        filename = f"marikiti_pick_list_{target_date.isoformat()}.xlsx"
+
     return StreamingResponse(
-        io.StringIO(csv_content),
-        media_type="text/csv",
+        io.BytesIO(excel_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
