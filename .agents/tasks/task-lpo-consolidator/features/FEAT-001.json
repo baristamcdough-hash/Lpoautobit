@@ -1,0 +1,37 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Build the Python FastAPI backend with PDF upload, AI-powered parsing/extraction, SQLite database, and REST API endpoints for the LPO consolidation pipeline.",
+  "status": "completed",
+  "steps": [
+    "Create project root structure: /backend directory with __init__.py files, /sample_pdfs directory, root .gitignore, and root README.md",
+    "Create backend/requirements.txt with dependencies: fastapi, uvicorn, sqlalchemy, python-multipart, PyPDF2, openai, pydantic, pytest, httpx, aiosqlite",
+    "Create backend/database.py with SQLite connection using SQLAlchemy async engine, session management, and Base model class. Database file stored at backend/data/lpo.db",
+    "Create backend/models.py with SQLAlchemy models: LPODocument (id, filename, customer_name, upload_timestamp, status) and LPOLineItem (id, document_id FK, item_name, quantity as float, unit, date_extracted)",
+    "Create backend/schemas.py with Pydantic models for API request/response: LPODocumentResponse, LPOLineItemResponse, MasterProcurementItem (item_name, total_quantity, unit), DistributionBreakdown (customer_name, items list), DashboardResponse",
+    "Create backend/services/pdf_parser.py with a function that accepts a PDF file (bytes), extracts text using PyPDF2, and returns the raw text content. Include fallback handling for scanned PDFs (return error message suggesting OCR).",
+    "Create backend/services/ai_extractor.py with a function that takes raw PDF text and uses OpenAI API (gpt-4o-mini model) to extract structured data: customer_name, line_items (item_name, quantity, unit). Use a detailed system prompt that handles Kenyan produce naming conventions (e.g., Nyanya=Tomatoes, Viazi=Potatoes, Kitunguu=Onions). Include a mock/fallback mode that uses regex patterns when OPENAI_API_KEY is not set.",
+    "Create backend/routers/lpo.py with endpoints: POST /api/lpo/upload (accepts multiple PDF files, processes each through parser+extractor, stores in DB), GET /api/lpo/raw-data (returns all LPO line items with optional date filter), GET /api/lpo/dashboard (returns aggregated master procurement totals and distribution breakdown for today or a given date), PATCH /api/lpo/items/{item_id}/status (toggle procurement status checkbox)",
+    "Create backend/main.py as the FastAPI app entry point: include CORS middleware (allow all origins for development), mount the lpo router, add a startup event to create DB tables, add health check endpoint at GET /api/health",
+    "Create backend/tests/conftest.py with pytest fixtures: async test client using httpx, test database with SQLite in-memory, sample PDF bytes fixture",
+    "Create backend/tests/test_upload.py with tests: successful PDF upload stores document and line items, upload with invalid file type returns 400, extraction fallback works when no API key is set",
+    "Create backend/tests/test_dashboard.py with tests: dashboard aggregates quantities correctly across multiple customers, date filtering works, distribution breakdown correctly maps items to customers",
+    "Create sample_pdfs/ directory with 2-3 sample text-based PDF files representing realistic Kenyan LPOs (Safari Hotel ordering produce, Kilimani School ordering produce, Junction Grocers ordering produce) for testing the pipeline end-to-end. Use reportlab or fpdf2 in a script, or just create a generation script at scripts/generate_sample_pdfs.py",
+    "Create a .env.example file documenting: OPENAI_API_KEY (optional - system works in mock mode without it), DATABASE_URL (defaults to sqlite:///backend/data/lpo.db)"
+  ],
+  "acceptance_criteria": [
+    "Running 'pip install -r backend/requirements.txt' succeeds without errors",
+    "Running 'pytest backend/tests/' passes all tests",
+    "The POST /api/lpo/upload endpoint accepts PDF files and returns extracted structured data",
+    "The GET /api/lpo/dashboard endpoint returns correctly aggregated master procurement totals",
+    "The system works in fallback/mock mode when OPENAI_API_KEY is not set",
+    "Sample PDF generation script runs and produces valid test PDFs"
+  ],
+  "verification": [
+    "pip install -r backend/requirements.txt",
+    "pytest backend/tests/ -v",
+    "python scripts/generate_sample_pdfs.py (should create sample PDFs in sample_pdfs/)"
+  ],
+  "blocked_reason": null,
+  "findings": "All 8 tests pass. Note: 'python' resolves to /opt/amazon/bin/python which lacks installed packages; use 'python3' or 'python3 -m pytest' for running commands. pytest-asyncio 1.2.0 installed (uses mode=strict). Pydantic V2 deprecation warnings for class-based Config (non-blocking). fpdf2 used for sample PDF generation and test fixtures."
+}
