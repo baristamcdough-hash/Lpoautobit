@@ -11,7 +11,7 @@ export default function App() {
     <BrowserRouter>
       <div className="min-h-screen flex flex-col">
         <Header />
-        <main className="flex-1 pt-16 pb-28">
+        <main className="flex-1 pt-16 pb-28 bg-slate-50">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/upload" element={<UploadPage />} />

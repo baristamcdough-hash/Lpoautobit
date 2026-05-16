@@ -17,10 +17,10 @@ export default function Header() {
   const subtitle = getSubtitle(location.pathname);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-green-600 text-white shadow-md">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-slate-900 text-white shadow-md">
       <div className="px-4 py-3">
-        <h1 className="text-lg font-bold">LPO Consolidator</h1>
-        <p className="text-sm text-green-100">{subtitle}</p>
+        <h1 className="text-lg font-bold tracking-tight">LPO Consolidator</h1>
+        <p className="text-sm text-slate-300">{subtitle}</p>
       </div>
     </header>
   );

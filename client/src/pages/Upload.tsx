@@ -76,21 +76,21 @@ export default function UploadPage() {
     <div className="p-4 max-w-lg mx-auto">
       {/* Drop Zone */}
       <div
-        className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
+        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
           dragOver
-            ? 'border-green-500 bg-green-50'
-            : 'border-gray-300 bg-white'
+            ? 'border-teal-500 bg-teal-50'
+            : 'border-slate-300 bg-white'
         }`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onClick={() => inputRef.current?.click()}
       >
-        <UploadIcon className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-        <p className="text-base font-medium text-gray-700">
+        <UploadIcon className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+        <p className="text-base font-medium text-slate-700">
           Drop PDF files here
         </p>
-        <p className="text-sm text-gray-500 mt-1">or tap to browse</p>
+        <p className="text-sm text-slate-500 mt-1">or tap to browse</p>
         <input
           ref={inputRef}
           type="file"
@@ -104,21 +104,21 @@ export default function UploadPage() {
       {/* File List */}
       {files.length > 0 && (
         <div className="mt-4 space-y-2">
-          <h3 className="text-sm font-medium text-gray-700">
+          <h3 className="text-sm font-medium text-slate-700">
             Selected Files ({files.length})
           </h3>
           {files.map((file, index) => (
             <div
               key={`${file.name}-${index}`}
-              className="flex items-center justify-between bg-white rounded-lg p-3 border border-gray-200"
+              className="flex items-center justify-between bg-white rounded-lg p-3 border border-slate-200 shadow-sm"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <FileText className="w-5 h-5 text-green-600 shrink-0" />
+                <FileText className="w-5 h-5 text-teal-600 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">
+                  <p className="text-sm font-medium text-slate-800 truncate">
                     {file.name}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-500">
                     {formatSize(file.size)}
                   </p>
                 </div>
@@ -128,7 +128,7 @@ export default function UploadPage() {
                   e.stopPropagation();
                   removeFile(index);
                 }}
-                className="text-gray-400 hover:text-red-500 p-1"
+                className="text-slate-400 hover:text-red-500 p-1"
               >
                 <XCircle className="w-5 h-5" />
               </button>
@@ -141,7 +141,7 @@ export default function UploadPage() {
       {files.length > 0 && uploadState !== 'uploading' && (
         <button
           onClick={handleUpload}
-          className="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg text-base transition-colors"
+          className="mt-4 w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-6 rounded-lg text-base transition-colors"
         >
           Upload {files.length} {files.length === 1 ? 'File' : 'Files'}
         </button>
@@ -149,7 +149,7 @@ export default function UploadPage() {
 
       {/* Uploading State */}
       {uploadState === 'uploading' && (
-        <div className="mt-4 flex items-center justify-center gap-2 text-green-600">
+        <div className="mt-4 flex items-center justify-center gap-2 text-teal-600">
           <Loader className="w-5 h-5 animate-spin" />
           <span className="text-sm font-medium">Processing PDFs...</span>
         </div>
@@ -157,15 +157,15 @@ export default function UploadPage() {
 
       {/* Success State */}
       {uploadState === 'success' && result && (
-        <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-green-700 mb-2">
+        <div className="mt-4 bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 text-emerald-700 mb-2">
             <CheckCircle className="w-5 h-5" />
             <span className="font-semibold">Upload Complete</span>
           </div>
-          <p className="text-sm text-green-800">
+          <p className="text-sm text-emerald-800">
             {result.documents.length} document{result.documents.length !== 1 ? 's' : ''} processed successfully.
           </p>
-          <p className="text-sm text-green-700 mt-1">{result.message}</p>
+          <p className="text-sm text-emerald-700 mt-1">{result.message}</p>
         </div>
       )}
 

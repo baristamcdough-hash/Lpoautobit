@@ -64,7 +64,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader className="w-8 h-8 animate-spin text-green-600" />
+        <Loader className="w-8 h-8 animate-spin text-teal-600" />
       </div>
     );
   }
@@ -81,21 +81,21 @@ export default function Dashboard() {
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+          className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
         />
         <button
           onClick={fetchData}
-          className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          className="p-2 border border-slate-300 rounded-lg hover:bg-slate-50"
           aria-label="Refresh"
         >
-          <RefreshCw className="w-5 h-5 text-gray-600" />
+          <RefreshCw className="w-5 h-5 text-slate-600" />
         </button>
       </div>
 
       {isEmpty ? (
         <div className="text-center py-12">
-          <p className="text-gray-500 text-base">No data for selected date</p>
-          <p className="text-gray-400 text-sm mt-1">
+          <p className="text-slate-500 text-base">No data for selected date</p>
+          <p className="text-slate-400 text-sm mt-1">
             Upload LPO documents to see procurement data here.
           </p>
         </div>
@@ -103,10 +103,10 @@ export default function Dashboard() {
         <>
           {/* Master Procurement Total */}
           <section className="mb-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-3">
+            <h2 className="text-lg font-bold text-slate-800 mb-3">
               Master Procurement Total
             </h2>
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
               {data!.master_procurement.map((item, index) => {
                 const isChecked = item.item_ids.every((id) =>
                   checkedItems.has(id)
@@ -115,15 +115,15 @@ export default function Dashboard() {
                   <div
                     key={`${item.item_name}-${index}`}
                     className={`flex items-center px-4 py-3 ${
-                      index !== 0 ? 'border-t border-gray-100' : ''
+                      index !== 0 ? 'border-t border-slate-100' : ''
                     }`}
                   >
                     <button
                       onClick={() => handleToggle(item.item_ids, !isChecked)}
                       className={`w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 mr-3 transition-colors ${
                         isChecked
-                          ? 'bg-green-600 border-green-600'
-                          : 'border-gray-300'
+                          ? 'bg-teal-600 border-teal-600'
+                          : 'border-slate-300'
                       }`}
                     >
                       {isChecked && <Check className="w-4 h-4 text-white" />}
@@ -132,8 +132,8 @@ export default function Dashboard() {
                       <p
                         className={`text-sm font-medium ${
                           isChecked
-                            ? 'line-through text-gray-400'
-                            : 'text-gray-800'
+                            ? 'line-through text-slate-400'
+                            : 'text-slate-800'
                         }`}
                       >
                         {item.item_name}
@@ -142,14 +142,14 @@ export default function Dashboard() {
                     <div className="text-right shrink-0 ml-2">
                       <span
                         className={`text-sm font-semibold ${
-                          isChecked ? 'text-gray-400' : 'text-gray-700'
+                          isChecked ? 'text-slate-400' : 'text-slate-700'
                         }`}
                       >
                         {item.total_quantity} {item.unit}
                       </span>
                     </div>
                     {isChecked && (
-                      <Check className="w-4 h-4 text-green-500 ml-2 shrink-0" />
+                      <Check className="w-4 h-4 text-teal-500 ml-2 shrink-0" />
                     )}
                   </div>
                 );
@@ -159,17 +159,17 @@ export default function Dashboard() {
 
           {/* Distribution Breakdown */}
           <section>
-            <h2 className="text-lg font-bold text-gray-800 mb-3">
+            <h2 className="text-lg font-bold text-slate-800 mb-3">
               Distribution Breakdown
             </h2>
             <div className="space-y-3">
               {data!.distribution.map((entry) => (
                 <div
                   key={entry.customer_name}
-                  className="bg-white rounded-xl border border-gray-200 overflow-hidden"
+                  className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden"
                 >
-                  <div className="bg-green-50 px-4 py-2 border-b border-gray-100">
-                    <h3 className="text-sm font-bold text-green-800">
+                  <div className="bg-slate-800 px-4 py-2 border-b border-slate-700">
+                    <h3 className="text-sm font-bold text-white">
                       {entry.customer_name}
                     </h3>
                   </div>
@@ -178,13 +178,13 @@ export default function Dashboard() {
                       <div
                         key={`${item.item_name}-${idx}`}
                         className={`flex justify-between py-1.5 ${
-                          idx !== 0 ? 'border-t border-gray-50' : ''
+                          idx !== 0 ? 'border-t border-slate-50' : ''
                         }`}
                       >
-                        <span className="text-sm text-gray-700">
+                        <span className="text-sm text-slate-700">
                           {item.item_name}
                         </span>
-                        <span className="text-sm font-medium text-gray-600">
+                        <span className="text-sm font-medium text-slate-600">
                           {item.quantity} {item.unit}
                         </span>
                       </div>
