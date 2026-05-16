@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 from datetime import date, datetime
 from typing import List, Optional
@@ -23,6 +24,8 @@ from backend.schemas import (
 from backend.services.ai_extractor import extract_lpo_data
 from backend.services.pdf_parser import extract_text_from_pdf
 from backend.services.sheets_export import generate_pick_list_csv, generate_raw_data_csv
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/lpo", tags=["LPO"])
 
@@ -60,8 +63,16 @@ async def upload_lpos(
 
         # Extract text from PDF
         text = extract_text_from_pdf(file_bytes)
+        logger.info(
+            "PDF text extraction for '%s': %d chars extracted",
+            file.filename,
+            len(text) if text else 0,
+        )
+        if text:
+            logger.debug("Extracted text preview: %s", text[:500])
 
         if not text:
+            logger.warning("No text extracted from '%s', marking as error", file.filename)
             doc.status = "error"
             await db.commit()
             documents.append(doc)
@@ -70,6 +81,18 @@ async def upload_lpos(
         # Extract structured data using AI or fallback
         try:
             extracted = await extract_lpo_data(text)
+            logger.info(
+                "Extraction result for '%s': customer='%s', %d line items",
+                file.filename,
+                extracted.get("customer_name", "Unknown"),
+                len(extracted.get("line_items", [])),
+            )
+            if not extracted.get("line_items"):
+                logger.warning(
+                    "No line items extracted from '%s'. Text content: %s",
+                    file.filename,
+                    text[:1000],
+                )
             doc.customer_name = extracted.get("customer_name", "Unknown")
             doc.status = "completed"
 
@@ -83,7 +106,8 @@ async def upload_lpos(
                     date_extracted=date.today(),
                 )
                 db.add(line_item)
-        except Exception:
+        except Exception as e:
+            logger.error("Extraction failed for '%s': %s", file.filename, str(e))
             doc.status = "error"
 
         documents.append(doc)

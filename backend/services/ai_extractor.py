@@ -128,8 +128,46 @@ def _extract_customer_name(text: str) -> str:
     return "Unknown Customer"
 
 
+def _normalize_unit(unit: str) -> str:
+    """Normalize extracted units to their canonical form.
+
+    Handles variations like 'kgs' -> 'Kg', 'bag' -> 'Bags', 'crate' -> 'Crates'.
+    """
+    unit_lower = unit.lower().strip()
+    unit_map = {
+        "kg": "Kg",
+        "kgs": "Kg",
+        "kilogram": "Kg",
+        "kilograms": "Kg",
+        "crate": "Crates",
+        "crates": "Crates",
+        "bag": "Bags",
+        "bags": "Bags",
+        "bunch": "Bunches",
+        "bunches": "Bunches",
+        "net": "Nets",
+        "nets": "Nets",
+        "box": "Boxes",
+        "boxes": "Boxes",
+        "piece": "Pieces",
+        "pieces": "Pieces",
+        "dozen": "Dozen",
+        "dozens": "Dozen",
+    }
+    return unit_map.get(unit_lower, unit.capitalize())
+
+
+# Flexible unit pattern that matches all common unit variations case-insensitively
+_UNIT_PATTERN = r"(?:crates?|bags?|bunches?|nets?|kgs?|kilograms?|boxes?|pieces?|dozens?)"
+
+
 def _extract_line_items(text: str) -> List[Dict[str, Any]]:
-    """Try to extract line items from LPO text using regex patterns."""
+    """Try to extract line items from LPO text using regex patterns.
+
+    Processes each line individually, trying multiple patterns per line
+    to handle PDFs that mix formats (e.g., some lines with separators,
+    some without).
+    """
     items = []
 
     # Swahili to English mapping
@@ -147,45 +185,72 @@ def _extract_line_items(text: str) -> List[Dict[str, Any]]:
         "spinachi": "Spinach",
     }
 
-    # Pattern: quantity unit item_name (e.g., "5 Crates Tomatoes")
-    pattern1 = r"(\d+(?:\.\d+)?)\s+(Crates?|Bags?|Bunches?|Nets?|Kg|Boxes?|Pieces?|Dozen)\s+(.+?)(?:\n|$)"
-    for match in re.finditer(pattern1, text, re.IGNORECASE):
-        quantity = float(match.group(1))
-        unit = match.group(2).strip()
-        item_name = match.group(3).strip()
-        # Normalize Swahili names
-        item_lower = item_name.lower()
-        if item_lower in swahili_map:
-            item_name = swahili_map[item_lower]
-        items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
+    # Pattern 1: quantity unit item_name (e.g., "5 Crates Tomatoes", "5kgs cabbages")
+    pattern1 = r"^(\d+(?:\.\d+)?)\s*(" + _UNIT_PATTERN + r")\s+(.+?)$"
+    # Pattern 2: item_name - quantity unit (e.g., "Tomatoes - 5 Crates", "cabbages - 5kgs")
+    pattern2 = r"^([A-Za-z][A-Za-z ]*?)\s*[-:]\s*(\d+(?:\.\d+)?)\s*(" + _UNIT_PATTERN + r")\s*$"
+    # Pattern 3: item_name quantity unit (e.g., "kitunguu 1 kg", "mangoes 1 bag")
+    pattern3 = r"^([A-Za-z][A-Za-z ]*?)\s+(\d+(?:\.\d+)?)\s*(" + _UNIT_PATTERN + r")\s*$"
+    # Pattern 4: table row "item_name | quantity | unit" or with tabs/multiple spaces
+    pattern4 = r"^([A-Za-z][A-Za-z ]*?)(?:\t|\s{2,}|\|)\s*(\d+(?:\.\d+)?)\s*(?:\t|\s{2,}|\|)\s*(" + _UNIT_PATTERN + r")\s*$"
 
-    if items:
-        return items
+    for line in text.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
 
-    # Pattern: item_name - quantity unit (e.g., "Tomatoes - 5 Crates")
-    pattern2 = r"([A-Za-z\s]+?)\s*[-:]\s*(\d+(?:\.\d+)?)\s*(Crates?|Bags?|Bunches?|Nets?|Kg|Boxes?|Pieces?|Dozen)"
-    for match in re.finditer(pattern2, text, re.IGNORECASE):
-        item_name = match.group(1).strip()
-        quantity = float(match.group(2))
-        unit = match.group(3).strip()
-        item_lower = item_name.lower()
-        if item_lower in swahili_map:
-            item_name = swahili_map[item_lower]
-        items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
+        matched = False
 
-    if items:
-        return items
-
-    # Pattern: table row style "item_name | quantity | unit" or with tabs/multiple spaces
-    pattern3 = r"([A-Za-z\s]+?)(?:\t|\s{2,}|\|)\s*(\d+(?:\.\d+)?)\s*(?:\t|\s{2,}|\|)\s*(Crates?|Bags?|Bunches?|Nets?|Kg|Boxes?|Pieces?|Dozen)"
-    for match in re.finditer(pattern3, text, re.IGNORECASE):
-        item_name = match.group(1).strip()
-        quantity = float(match.group(2))
-        unit = match.group(3).strip()
-        item_lower = item_name.lower()
-        if item_lower in swahili_map:
-            item_name = swahili_map[item_lower]
-        if item_name and len(item_name) > 1:
+        # Try pattern 1: quantity unit item_name
+        match = re.match(pattern1, line, re.IGNORECASE)
+        if match:
+            quantity = float(match.group(1))
+            unit = _normalize_unit(match.group(2).strip())
+            item_name = match.group(3).strip()
+            item_lower = item_name.lower()
+            if item_lower in swahili_map:
+                item_name = swahili_map[item_lower]
             items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
+            matched = True
+
+        # Try pattern 2: item_name - quantity unit
+        if not matched:
+            match = re.match(pattern2, line, re.IGNORECASE)
+            if match:
+                item_name = match.group(1).strip()
+                quantity = float(match.group(2))
+                unit = _normalize_unit(match.group(3).strip())
+                item_lower = item_name.lower()
+                if item_lower in swahili_map:
+                    item_name = swahili_map[item_lower]
+                items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
+                matched = True
+
+        # Try pattern 3: item_name quantity unit
+        if not matched:
+            match = re.match(pattern3, line, re.IGNORECASE)
+            if match:
+                item_name = match.group(1).strip()
+                quantity = float(match.group(2))
+                unit = _normalize_unit(match.group(3).strip())
+                item_lower = item_name.lower()
+                if item_lower in swahili_map:
+                    item_name = swahili_map[item_lower]
+                if item_name and len(item_name) > 1:
+                    items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
+                    matched = True
+
+        # Try pattern 4: table row style
+        if not matched:
+            match = re.match(pattern4, line, re.IGNORECASE)
+            if match:
+                item_name = match.group(1).strip()
+                quantity = float(match.group(2))
+                unit = _normalize_unit(match.group(3).strip())
+                item_lower = item_name.lower()
+                if item_lower in swahili_map:
+                    item_name = swahili_map[item_lower]
+                if item_name and len(item_name) > 1:
+                    items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
 
     return items
