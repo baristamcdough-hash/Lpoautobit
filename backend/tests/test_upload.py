@@ -37,7 +37,7 @@ async def test_upload_non_pdf_returns_400(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_fallback_extraction_works(client: AsyncClient, sample_pdf_bytes: bytes):
     """Test that the fallback extractor works when no API key is set."""
-    with patch.dict("os.environ", {"OPENAI_API_KEY": ""}, clear=False):
+    with patch.dict("os.environ", {"GEMINI_API_KEY": ""}, clear=False):
         response = await client.post(
             "/api/lpo/upload",
             files=[("files", ("test_lpo.pdf", io.BytesIO(sample_pdf_bytes), "application/pdf"))],

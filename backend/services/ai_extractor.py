@@ -39,7 +39,7 @@ Return ONLY valid JSON in this exact format:
 async def extract_lpo_data(text: str) -> Dict[str, Any]:
     """Extract structured LPO data from raw text.
 
-    Uses OpenAI API when OPENAI_API_KEY is set, otherwise falls back
+    Uses Google Gemini API when GEMINI_API_KEY is set, otherwise falls back
     to regex-based extraction.
 
     Args:
@@ -48,33 +48,38 @@ async def extract_lpo_data(text: str) -> Dict[str, Any]:
     Returns:
         Dict with keys: customer_name (str), line_items (list of dicts)
     """
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY")
 
     if api_key and api_key != "your-key-here":
-        return await _extract_with_openai(text, api_key)
+        return await _extract_with_gemini(text, api_key)
     else:
-        logger.info("No OPENAI_API_KEY set, using fallback regex parser")
+        logger.info("No GEMINI_API_KEY set, using fallback regex parser")
         return _extract_with_fallback(text)
 
 
-async def _extract_with_openai(text: str, api_key: str) -> Dict[str, Any]:
-    """Extract data using OpenAI API."""
+async def _extract_with_gemini(text: str, api_key: str) -> Dict[str, Any]:
+    """Extract data using Google Gemini API."""
     try:
-        from openai import AsyncOpenAI
+        import google.generativeai as genai
 
-        client = AsyncOpenAI(api_key=api_key)
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.0-flash")
 
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Extract data from this LPO:\n\n{text}"},
-            ],
-            temperature=0.0,
-            response_format={"type": "json_object"},
-        )
+        prompt = f"{SYSTEM_PROMPT}\n\nExtract data from this LPO:\n\n{text}"
+        response = model.generate_content(prompt)
 
-        content = response.choices[0].message.content
+        content = response.text
+
+        # Gemini sometimes wraps JSON in markdown code fences, strip them
+        content = content.strip()
+        if content.startswith("```json"):
+            content = content[len("```json"):]
+        elif content.startswith("```"):
+            content = content[len("```"):]
+        if content.endswith("```"):
+            content = content[:-len("```")]
+        content = content.strip()
+
         result = json.loads(content)
 
         return {
@@ -82,7 +87,7 @@ async def _extract_with_openai(text: str, api_key: str) -> Dict[str, Any]:
             "line_items": result.get("line_items", []),
         }
     except Exception as e:
-        logger.error(f"OpenAI extraction failed: {e}")
+        logger.error(f"Gemini extraction failed: {e}")
         return _extract_with_fallback(text)
 
 
