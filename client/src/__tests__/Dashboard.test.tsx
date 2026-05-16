@@ -46,7 +46,7 @@ describe('Dashboard', () => {
     mockGetDashboard.mockResolvedValue({
       date: '2024-01-15',
       master_procurement: [
-        { item_name: 'Tomatoes', total_quantity: 100, unit: 'kg', item_ids: [1] },
+        { item_name: 'Tomatoes', total_quantity: 100, unit: 'kg', item_ids: [1], item_statuses: ['pending'] },
       ],
       distribution: [
         {
@@ -67,7 +67,7 @@ describe('Dashboard', () => {
     mockGetDashboard.mockResolvedValue({
       date: '2024-01-15',
       master_procurement: [
-        { item_name: 'Potatoes', total_quantity: 200, unit: 'kg', item_ids: [2, 3] },
+        { item_name: 'Potatoes', total_quantity: 200, unit: 'kg', item_ids: [2, 3], item_statuses: ['pending', 'pending'] },
       ],
       distribution: [
         {

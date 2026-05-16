@@ -27,5 +27,6 @@ class LPOLineItem(Base):
     quantity = Column(Float, nullable=False)
     unit = Column(String, nullable=False)
     date_extracted = Column(Date, default=date.today)
+    status = Column(String, default="pending")
 
     document = relationship("LPODocument", back_populates="line_items")

@@ -37,6 +37,7 @@ class MasterProcurementItem(BaseModel):
     total_quantity: float
     unit: str
     item_ids: List[int]
+    item_statuses: List[str] = []
 
 
 class DistributionItemDetail(BaseModel):

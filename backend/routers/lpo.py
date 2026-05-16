@@ -46,6 +46,10 @@ async def upload_lpos(
         # Read file content
         file_bytes = await file.read()
 
+        # Check file size (10 MB limit)
+        if len(file_bytes) > 10 * 1024 * 1024:
+            raise HTTPException(413, "File too large. Maximum size is 10MB.")
+
         # Create document record
         doc = LPODocument(
             filename=file.filename,
@@ -146,12 +150,13 @@ async def get_dashboard(
     items = result.scalars().all()
 
     # Build master procurement (aggregate by item_name + unit)
-    procurement_map = defaultdict(lambda: {"total_quantity": 0.0, "unit": "", "item_ids": []})
+    procurement_map = defaultdict(lambda: {"total_quantity": 0.0, "unit": "", "item_ids": [], "item_statuses": []})
     for item in items:
         key = (item.item_name.lower(), item.unit.lower())
         procurement_map[key]["total_quantity"] += item.quantity
         procurement_map[key]["unit"] = item.unit
         procurement_map[key]["item_ids"].append(item.id)
+        procurement_map[key]["item_statuses"].append(item.status or "pending")
 
     master_procurement = [
         MasterProcurementItem(
@@ -159,6 +164,7 @@ async def get_dashboard(
             total_quantity=data["total_quantity"],
             unit=data["unit"],
             item_ids=data["item_ids"],
+            item_statuses=data["item_statuses"],
         )
         for key, data in procurement_map.items()
     ]
@@ -206,15 +212,8 @@ async def update_item_status(
     if not item:
         raise HTTPException(status_code=404, detail="Item not found.")
 
-    # For now, we store status on the parent document
-    # In a future iteration, line items could have their own status field
-    result = await db.execute(
-        select(LPODocument).where(LPODocument.id == item.document_id)
-    )
-    doc = result.scalar_one_or_none()
-    if doc:
-        doc.status = body.status
-        await db.commit()
+    item.status = body.status
+    await db.commit()
 
     return {"item_id": item_id, "status": body.status}
 

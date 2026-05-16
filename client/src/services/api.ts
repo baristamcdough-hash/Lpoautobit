@@ -26,6 +26,7 @@ export interface MasterProcurementItem {
   total_quantity: number;
   unit: string;
   item_ids: number[];
+  item_statuses: string[];
 }
 
 export interface DistributionItemDetail {
@@ -71,7 +72,7 @@ export async function uploadPDFs(files: File[]): Promise<UploadResponse> {
 }
 
 export async function getRawData(date?: string): Promise<RawDataItem[]> {
-  const params = date ? { date } : {};
+  const params = date ? { date_filter: date } : {};
   const response = await api.get<RawDataItem[]>('/lpo/raw-data', { params });
   return response.data;
 }

@@ -19,6 +19,16 @@ export default function Dashboard() {
     try {
       const result = await getDashboard(date);
       setData(result);
+      // Initialize checked state from backend item statuses
+      const checked = new Set<number>();
+      result.master_procurement.forEach((item) => {
+        item.item_ids.forEach((id, index) => {
+          if ((item.item_statuses ?? [])[index] === 'procured') {
+            checked.add(id);
+          }
+        });
+      });
+      setCheckedItems(checked);
     } catch {
       setData(null);
     } finally {
