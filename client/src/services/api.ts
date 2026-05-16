@@ -78,7 +78,7 @@ export async function getRawData(date?: string): Promise<RawDataItem[]> {
 }
 
 export async function getDashboard(date?: string): Promise<DashboardData> {
-  const params = date ? { date } : {};
+  const params = date ? { date_filter: date } : {};
   const response = await api.get<DashboardData>('/lpo/dashboard', { params });
   return response.data;
 }
