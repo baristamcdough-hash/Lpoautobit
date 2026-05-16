@@ -166,13 +166,23 @@ def _normalize_unit(unit: str) -> str:
 _UNIT_PATTERN = r"(?:crates?|bags?|bunches?|nets?|kgs?|kilograms?|boxes?|pieces?|dozens?)"
 
 
-def _extract_line_items(text: str) -> List[Dict[str, Any]]:
-    """Try to extract line items from LPO text using regex patterns.
+def _extract_multiline_table_items(text: str) -> List[Dict[str, Any]]:
+    """Extract items from multi-line table format produced by pymupdf.
 
-    Processes each line individually, trying multiple patterns per line
-    to handle PDFs that mix formats (e.g., some lines with separators,
-    some without).
+    pymupdf often extracts PDF table cells as separate lines:
+        1
+        Tomatoes
+        5
+        Crates
+        1500
+        7500
+
+    This function detects such sequences and reassembles them into items.
+    Each table row has fields: row_number, item_name, quantity, unit,
+    and optionally unit_price and total.
+    Item names may span multiple lines (e.g., "Sukuma Wiki").
     """
+    lines = [line.strip() for line in text.split("\n")]
     items = []
 
     # Swahili to English mapping
@@ -190,6 +200,141 @@ def _extract_line_items(text: str) -> List[Dict[str, Any]]:
         "spinachi": "Spinach",
     }
 
+    unit_re = re.compile(r"^" + _UNIT_PATTERN + r"$", re.IGNORECASE)
+
+    # Find the table header to locate where data starts.
+    # Look for a line that is "#" or "Item Description" which indicates a table header.
+    header_found = False
+    i = 0
+    while i < len(lines):
+        if lines[i] == "#" or lines[i].lower() == "item description":
+            header_found = True
+            break
+        i += 1
+
+    if not header_found:
+        return []
+
+    # Skip all header lines until we reach the first row number "1"
+    while i < len(lines):
+        if lines[i] == "1":
+            break
+        i += 1
+
+    if i >= len(lines):
+        return []
+
+    # Parse table rows. Strategy: look for a row number, then scan forward
+    # for a unit line. Everything between row_number and the first numeric
+    # line before the unit is the item name; the numeric line just before
+    # the unit is the quantity.
+    expected_row = 1
+    while i < len(lines):
+        line = lines[i]
+
+        # Must match the expected row number exactly
+        if line != str(expected_row):
+            # If we hit non-row content, the table has ended
+            if re.match(r"^(GRAND|Authorized|Terms)", line, re.IGNORECASE):
+                break
+            i += 1
+            continue
+
+        # Found row number; advance past it
+        i += 1
+
+        # Collect all lines until we find a unit line.
+        # The structure is: [item_name lines...] [quantity] [unit] [price numbers...]
+        # We scan forward to find the unit, then work backwards.
+        scan = i
+        unit_idx = None
+        while scan < len(lines):
+            if unit_re.match(lines[scan]):
+                unit_idx = scan
+                break
+            # Stop scanning if we hit end-of-table markers
+            if re.match(r"^(GRAND|Authorized|Terms)", lines[scan], re.IGNORECASE):
+                break
+            scan += 1
+
+        if unit_idx is None:
+            break
+
+        # The line just before the unit is the quantity
+        qty_idx = unit_idx - 1
+        if qty_idx < i:
+            i = scan + 1
+            expected_row += 1
+            continue
+
+        if not re.match(r"^\d+(?:\.\d+)?$", lines[qty_idx]):
+            i = scan + 1
+            expected_row += 1
+            continue
+
+        quantity = float(lines[qty_idx])
+        unit = _normalize_unit(lines[unit_idx])
+
+        # Everything between i and qty_idx is the item name
+        item_parts = lines[i:qty_idx]
+        item_name = " ".join(item_parts).strip()
+
+        # Advance past unit and skip up to 2 trailing numeric fields (unit_price, total)
+        i = unit_idx + 1
+        skipped = 0
+        while i < len(lines) and skipped < 2 and re.match(r"^[\d,]+(?:\.\d+)?$", lines[i]):
+            i += 1
+            skipped += 1
+
+        # Apply Swahili mapping
+        item_lower = item_name.lower()
+        if item_lower in swahili_map:
+            item_name = swahili_map[item_lower]
+
+        if item_name and len(item_name) > 1:
+            items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
+
+        expected_row += 1
+
+    return items
+
+
+def _extract_line_items(text: str) -> List[Dict[str, Any]]:
+    """Try to extract line items from LPO text using regex patterns.
+
+    First attempts multi-line table extraction (for pymupdf output where each
+    cell is on its own line), then falls back to per-line pattern matching.
+    """
+    # Try multi-line table extraction first (handles pymupdf output)
+    items = _extract_multiline_table_items(text)
+    if items:
+        return items
+
+    items = []
+
+    # Swahili to English mapping
+    swahili_map = {
+        "nyanya": "Tomatoes",
+        "viazi": "Potatoes",
+        "kitunguu": "Onions",
+        "sukuma wiki": "Kale",
+        "sukuma": "Kale",
+        "mahindi": "Maize",
+        "ndizi": "Bananas",
+        "karoti": "Carrots",
+        "pilipili": "Peppers",
+        "kabichi": "Cabbage",
+        "spinachi": "Spinach",
+    }
+
+    # Pattern 0 (LPO table): row number glued to item name, then quantity, unit,
+    # with optional trailing price columns ignored.
+    # Matches: "1Tomatoes 5 Crates 1500 7500" or "3Sukuma Wiki 3 Bunches 200 600"
+    pattern0 = (
+        r"^\d+([A-Za-z][A-Za-z ]*?)\s+(\d+(?:\.\d+)?)\s+("
+        + _UNIT_PATTERN
+        + r")(?:\s+\d[\d,]*(?:\.\d+)?)*\s*$"
+    )
     # Pattern 1: quantity unit item_name (e.g., "5 Crates Tomatoes", "5kgs cabbages")
     pattern1 = r"^(\d+(?:\.\d+)?)\s*(" + _UNIT_PATTERN + r")\s+(.+?)$"
     # Pattern 2: item_name - quantity unit (e.g., "Tomatoes - 5 Crates", "cabbages - 5kgs")
@@ -206,17 +351,31 @@ def _extract_line_items(text: str) -> List[Dict[str, Any]]:
 
         matched = False
 
-        # Try pattern 1: quantity unit item_name
-        match = re.match(pattern1, line, re.IGNORECASE)
+        # Try pattern 0: LPO table row (row_number glued to item name)
+        match = re.match(pattern0, line, re.IGNORECASE)
         if match:
-            quantity = float(match.group(1))
-            unit = _normalize_unit(match.group(2).strip())
-            item_name = match.group(3).strip()
+            item_name = match.group(1).strip()
+            quantity = float(match.group(2))
+            unit = _normalize_unit(match.group(3).strip())
             item_lower = item_name.lower()
             if item_lower in swahili_map:
                 item_name = swahili_map[item_lower]
-            items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
-            matched = True
+            if item_name and len(item_name) > 1:
+                items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
+                matched = True
+
+        # Try pattern 1: quantity unit item_name
+        if not matched:
+            match = re.match(pattern1, line, re.IGNORECASE)
+            if match:
+                quantity = float(match.group(1))
+                unit = _normalize_unit(match.group(2).strip())
+                item_name = match.group(3).strip()
+                item_lower = item_name.lower()
+                if item_lower in swahili_map:
+                    item_name = swahili_map[item_lower]
+                items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
+                matched = True
 
         # Try pattern 2: item_name - quantity unit
         if not matched:
