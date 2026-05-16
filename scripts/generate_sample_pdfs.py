@@ -35,7 +35,7 @@ def create_lpo_pdf(
     # LPO Details
     pdf.set_font("Helvetica", size=11)
     pdf.cell(95, 8, text=f"LPO No: {lpo_number}", new_x="RIGHT", new_y="TOP")
-    pdf.cell(95, 8, text=f"Date: {date.today().isoformat()}", new_x="LMARGIN", new_y="NEXT", align="R")
+    pdf.cell(95, 8, text="Date: 2026-05-16", new_x="LMARGIN", new_y="NEXT", align="R")
     pdf.ln(5)
 
     # Customer Info

@@ -1,7 +1,6 @@
-import io
 import logging
 
-from PyPDF2 import PdfReader
+import fitz  # pymupdf
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +8,7 @@ MAX_TEXT_LENGTH = 100_000
 
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
-    """Extract text content from PDF bytes using PyPDF2.
+    """Extract text content from PDF bytes using pymupdf (fitz).
 
     Args:
         file_bytes: Raw bytes of the PDF file.
@@ -18,30 +17,25 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
         Extracted text content as a string. Returns empty string on failure.
     """
     try:
-        reader = PdfReader(io.BytesIO(file_bytes))
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
         text_parts = []
-        for page in reader.pages:
-            try:
-                page_text = page.extract_text()
-                if page_text:
-                    text_parts.append(page_text)
-            except Exception as e:
-                logger.warning(f"Failed to extract text from a PDF page: {e}")
-                continue
+        for page in doc:
+            text = page.get_text()
+            if text:
+                text_parts.append(text)
+        doc.close()
 
         full_text = "\n".join(text_parts)
 
         if not full_text.strip():
             logger.warning(
-                "No text extracted from PDF. "
-                "The PDF may be scanned/image-based and require OCR."
+                "No text extracted from PDF. The PDF may be scanned/image-based."
             )
             return ""
 
         if len(full_text) > MAX_TEXT_LENGTH:
             logger.warning(
-                f"Extracted text exceeds {MAX_TEXT_LENGTH} characters "
-                f"({len(full_text)} chars). Truncating."
+                f"Text exceeds {MAX_TEXT_LENGTH} chars, truncating."
             )
             full_text = full_text[:MAX_TEXT_LENGTH]
 
