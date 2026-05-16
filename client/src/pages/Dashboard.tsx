@@ -196,9 +196,22 @@ export default function Dashboard() {
           </section>
 
           {/* Signature */}
-          <p className="text-center text-xs text-gray-300 mt-6">
-            nativecodesdevelopers@gmail.com
-          </p>
+          <div className="text-center mt-6 mb-2">
+            <p className="text-xs text-gray-300">
+              nativecodesdevelopers@gmail.com
+            </p>
+            <p className="text-xs text-gray-300 mt-1">
+              made wt ♥️ by:{' '}
+              <a
+                href="https://wa.me/254717702563"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-green-400 transition-colors"
+              >
+                P.oR.iot🍄
+              </a>
+            </p>
+          </div>
         </>
       )}
     </div>
