@@ -20,7 +20,7 @@ from backend.schemas import (
     StatusUpdate,
     UploadResponse,
 )
-from backend.services.ai_extractor import extract_lpo_data
+from backend.services.ai_extractor import extract_lpo_data, _normalize_item_name
 from backend.services.pdf_parser import extract_text_from_pdf
 from backend.services.sheets_export import generate_pick_list_csv, generate_raw_data_csv
 
@@ -149,10 +149,11 @@ async def get_dashboard(
     result = await db.execute(query)
     items = result.scalars().all()
 
-    # Build master procurement (aggregate by item_name + unit)
+    # Build master procurement (aggregate by normalized item_name + unit)
     procurement_map = defaultdict(lambda: {"total_quantity": 0.0, "unit": "", "item_ids": [], "item_statuses": []})
     for item in items:
-        key = (item.item_name.lower(), item.unit.lower())
+        normalized_name = _normalize_item_name(item.item_name)
+        key = (normalized_name.lower(), item.unit.lower())
         procurement_map[key]["total_quantity"] += item.quantity
         procurement_map[key]["unit"] = item.unit
         procurement_map[key]["item_ids"].append(item.id)
@@ -282,7 +283,8 @@ async def export_data(
             lambda: {"total_quantity": 0.0, "unit": ""}
         )
         for item in items:
-            key = (item.item_name.lower(), item.unit.lower())
+            normalized_name = _normalize_item_name(item.item_name)
+            key = (normalized_name.lower(), item.unit.lower())
             procurement_map[key]["total_quantity"] += item.quantity
             procurement_map[key]["unit"] = item.unit
 
