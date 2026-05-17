@@ -82,9 +82,17 @@ async def _extract_with_gemini(text: str, api_key: str) -> Dict[str, Any]:
 
         result = json.loads(content)
 
+        # Normalize item names for consistent aggregation across PDFs
+        line_items = result.get("line_items", [])
+        for item in line_items:
+            if "item_name" in item:
+                item["item_name"] = _normalize_item_name(item["item_name"])
+            if "unit" in item:
+                item["unit"] = _normalize_unit(item["unit"])
+
         return {
             "customer_name": result.get("customer_name", "Unknown"),
-            "line_items": result.get("line_items", []),
+            "line_items": line_items,
         }
     except Exception as e:
         logger.error(f"Gemini extraction failed: {e}")
@@ -131,6 +139,96 @@ def _extract_customer_name(text: str) -> str:
                 return line
 
     return "Unknown Customer"
+
+
+def _normalize_item_name(name: str) -> str:
+    """Normalize produce item names to a canonical form.
+
+    Handles plural/singular variations, common misspellings, and Swahili names
+    so that the same item from different PDFs always gets the same name in the DB.
+    """
+    name = name.strip()
+    if not name:
+        return name
+
+    # Swahili to English mapping
+    swahili_map = {
+        "nyanya": "Tomatoes",
+        "viazi": "Potatoes",
+        "kitunguu": "Onions",
+        "sukuma wiki": "Kale",
+        "sukuma": "Kale",
+        "mahindi": "Maize",
+        "ndizi": "Bananas",
+        "karoti": "Carrots",
+        "pilipili": "Peppers",
+        "kabichi": "Cabbage",
+        "spinachi": "Spinach",
+    }
+
+    name_lower = name.lower().strip()
+
+    # Check Swahili mapping first
+    if name_lower in swahili_map:
+        return swahili_map[name_lower]
+
+    # Canonical English produce names (maps variations to standard plural form)
+    canonical_map = {
+        "tomato": "Tomatoes",
+        "tomatoes": "Tomatoes",
+        "potato": "Potatoes",
+        "potatoes": "Potatoes",
+        "onion": "Onions",
+        "onions": "Onions",
+        "carrot": "Carrots",
+        "carrots": "Carrots",
+        "cabbage": "Cabbage",
+        "cabbages": "Cabbage",
+        "kale": "Kale",
+        "spinach": "Spinach",
+        "banana": "Bananas",
+        "bananas": "Bananas",
+        "pepper": "Peppers",
+        "peppers": "Peppers",
+        "maize": "Maize",
+        "corn": "Maize",
+        "sukuma wiki": "Kale",
+        "watermelon": "Watermelon",
+        "watermelons": "Watermelon",
+        "mango": "Mangoes",
+        "mangoes": "Mangoes",
+        "mangos": "Mangoes",
+        "avocado": "Avocados",
+        "avocados": "Avocados",
+        "pineapple": "Pineapples",
+        "pineapples": "Pineapples",
+        "orange": "Oranges",
+        "oranges": "Oranges",
+        "lemon": "Lemons",
+        "lemons": "Lemons",
+        "lime": "Limes",
+        "limes": "Limes",
+        "garlic": "Garlic",
+        "ginger": "Ginger",
+        "cucumber": "Cucumbers",
+        "cucumbers": "Cucumbers",
+        "lettuce": "Lettuce",
+        "broccoli": "Broccoli",
+        "peas": "Peas",
+        "beans": "Beans",
+        "bean": "Beans",
+        "mushroom": "Mushrooms",
+        "mushrooms": "Mushrooms",
+        "courgette": "Courgettes",
+        "courgettes": "Courgettes",
+        "zucchini": "Courgettes",
+    }
+
+    if name_lower in canonical_map:
+        return canonical_map[name_lower]
+
+    # Default: return title-cased version for consistency
+    return name.title()
 
 
 def _normalize_unit(unit: str) -> str:
@@ -184,21 +282,6 @@ def _extract_multiline_table_items(text: str) -> List[Dict[str, Any]]:
     """
     lines = [line.strip() for line in text.split("\n")]
     items = []
-
-    # Swahili to English mapping
-    swahili_map = {
-        "nyanya": "Tomatoes",
-        "viazi": "Potatoes",
-        "kitunguu": "Onions",
-        "sukuma wiki": "Kale",
-        "sukuma": "Kale",
-        "mahindi": "Maize",
-        "ndizi": "Bananas",
-        "karoti": "Carrots",
-        "pilipili": "Peppers",
-        "kabichi": "Cabbage",
-        "spinachi": "Spinach",
-    }
 
     unit_re = re.compile(r"^" + _UNIT_PATTERN + r"$", re.IGNORECASE)
 
@@ -286,10 +369,8 @@ def _extract_multiline_table_items(text: str) -> List[Dict[str, Any]]:
             i += 1
             skipped += 1
 
-        # Apply Swahili mapping
-        item_lower = item_name.lower()
-        if item_lower in swahili_map:
-            item_name = swahili_map[item_lower]
+        # Apply item name normalization (handles Swahili, plural/singular, etc.)
+        item_name = _normalize_item_name(item_name)
 
         if item_name and len(item_name) > 1:
             items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
@@ -311,21 +392,6 @@ def _extract_line_items(text: str) -> List[Dict[str, Any]]:
         return items
 
     items = []
-
-    # Swahili to English mapping
-    swahili_map = {
-        "nyanya": "Tomatoes",
-        "viazi": "Potatoes",
-        "kitunguu": "Onions",
-        "sukuma wiki": "Kale",
-        "sukuma": "Kale",
-        "mahindi": "Maize",
-        "ndizi": "Bananas",
-        "karoti": "Carrots",
-        "pilipili": "Peppers",
-        "kabichi": "Cabbage",
-        "spinachi": "Spinach",
-    }
 
     # Pattern 0 (LPO table): row number glued to item name, then quantity, unit,
     # with optional trailing price columns ignored.
@@ -354,12 +420,9 @@ def _extract_line_items(text: str) -> List[Dict[str, Any]]:
         # Try pattern 0: LPO table row (row_number glued to item name)
         match = re.match(pattern0, line, re.IGNORECASE)
         if match:
-            item_name = match.group(1).strip()
+            item_name = _normalize_item_name(match.group(1).strip())
             quantity = float(match.group(2))
             unit = _normalize_unit(match.group(3).strip())
-            item_lower = item_name.lower()
-            if item_lower in swahili_map:
-                item_name = swahili_map[item_lower]
             if item_name and len(item_name) > 1:
                 items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
                 matched = True
@@ -370,10 +433,7 @@ def _extract_line_items(text: str) -> List[Dict[str, Any]]:
             if match:
                 quantity = float(match.group(1))
                 unit = _normalize_unit(match.group(2).strip())
-                item_name = match.group(3).strip()
-                item_lower = item_name.lower()
-                if item_lower in swahili_map:
-                    item_name = swahili_map[item_lower]
+                item_name = _normalize_item_name(match.group(3).strip())
                 items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
                 matched = True
 
@@ -381,12 +441,9 @@ def _extract_line_items(text: str) -> List[Dict[str, Any]]:
         if not matched:
             match = re.match(pattern2, line, re.IGNORECASE)
             if match:
-                item_name = match.group(1).strip()
+                item_name = _normalize_item_name(match.group(1).strip())
                 quantity = float(match.group(2))
                 unit = _normalize_unit(match.group(3).strip())
-                item_lower = item_name.lower()
-                if item_lower in swahili_map:
-                    item_name = swahili_map[item_lower]
                 items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
                 matched = True
 
@@ -394,12 +451,9 @@ def _extract_line_items(text: str) -> List[Dict[str, Any]]:
         if not matched:
             match = re.match(pattern3, line, re.IGNORECASE)
             if match:
-                item_name = match.group(1).strip()
+                item_name = _normalize_item_name(match.group(1).strip())
                 quantity = float(match.group(2))
                 unit = _normalize_unit(match.group(3).strip())
-                item_lower = item_name.lower()
-                if item_lower in swahili_map:
-                    item_name = swahili_map[item_lower]
                 if item_name and len(item_name) > 1:
                     items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
                     matched = True
@@ -408,12 +462,9 @@ def _extract_line_items(text: str) -> List[Dict[str, Any]]:
         if not matched:
             match = re.match(pattern4, line, re.IGNORECASE)
             if match:
-                item_name = match.group(1).strip()
+                item_name = _normalize_item_name(match.group(1).strip())
                 quantity = float(match.group(2))
                 unit = _normalize_unit(match.group(3).strip())
-                item_lower = item_name.lower()
-                if item_lower in swahili_map:
-                    item_name = swahili_map[item_lower]
                 if item_name and len(item_name) > 1:
                     items.append({"item_name": item_name, "quantity": quantity, "unit": unit})
 
